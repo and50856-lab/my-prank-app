@@ -17,7 +17,7 @@ class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // Разворачиваем поверх блокировки и не даем экрану гаснуть
+        // Разворачиваем поверх блокировки экрана и не даем ему погаснуть
         window.setFlags(
             WindowManager.LayoutParams.FLAG_FULLSCREEN or
             WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED or
@@ -30,16 +30,17 @@ class MainActivity : AppCompatActivity() {
         setContentView(R.layout.activity_main)
         hideSystemUI()
 
+        // Инициализация аудио и выкрутка на максимум
         audioManager = getSystemService(Context.AUDIO_SERVICE) as AudioManager
         setMaxVolume()
 
-        // Запуск музыки из res/raw/sound.mp3 в цикле
+        // Запуск твоего звука (res/raw/sound.mp3) в цикле
         mediaPlayer = MediaPlayer.create(this, R.raw.sound).apply {
             isLooping = true
             start()
         }
 
-        // Поток, который постоянно держит громкость на максимуме
+        // Фоновый поток, который каждые 150мс проверяет и возвращает громкость на максимум, если её пытаются сбросить
         Thread {
             while (isRunning) {
                 try {
@@ -51,7 +52,7 @@ class MainActivity : AppCompatActivity() {
             }
         }.start()
 
-        // Обработка клика по секретной кнопке
+        // Обработка нажатия на секретную невидимую кнопку в левом нижнем углу
         findViewById<View>(R.id.secretButton).setOnClickListener {
             stopPrank()
         }
@@ -75,21 +76,26 @@ class MainActivity : AppCompatActivity() {
 
     override fun onWindowFocusChanged(hasFocus: Boolean) {
         super.onWindowFocusChanged(hasFocus)
-        if (hasFocus) hideSystemUI()
+        if (hasFocus) {
+            hideSystemUI()
+        }
     }
 
+    // Блокируем системную кнопку "Назад"
     override fun onBackPressed() {
-        // Блокируем кнопку "Назад"
+        // Ничего не делаем
     }
 
+    // Перехватываем физические кнопки громкости, чтобы они не работали
     override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
         if (keyCode == KeyEvent.KEYCODE_VOLUME_DOWN || keyCode == KeyEvent.KEYCODE_VOLUME_UP) {
-            setMaxVolume() // Перехватываем качельки громкости
+            setMaxVolume()
             return true
         }
         return super.onKeyDown(keyCode, event)
     }
 
+    // Остановка пранка и выход из приложения при нажатии на секретную кнопку
     private fun stopPrank() {
         isRunning = false
         mediaPlayer?.stop()
