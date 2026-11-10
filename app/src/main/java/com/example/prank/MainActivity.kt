@@ -1,6 +1,7 @@
 package com.example.prank
 
 import android.content.Context
+import android.content.Intent
 import android.media.AudioManager
 import android.media.MediaPlayer
 import android.os.Build
@@ -20,7 +21,7 @@ class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // Хардкор: вылезаем поверх блокировки экрана и не даем ему погаснуть
+        // Жесткий показ поверх блокировки
         window.addFlags(
             WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED or
             WindowManager.LayoutParams.FLAG_DISMISS_KEYGUARD or
@@ -30,21 +31,20 @@ class MainActivity : AppCompatActivity() {
         setContentView(R.layout.activity_main)
         hideSystemUI()
 
-        // Инициализация аудио и выкрутка на максимум
+        // Выкручиваем громкость на максимум
         audioManager = getSystemService(Context.AUDIO_SERVICE) as AudioManager
         setMaxVolume()
 
-        // Запуск звука в цикле
+        // Запуск звука с гарантированным циклом
         try {
-            mediaPlayer = MediaPlayer.create(this, R.raw.sound)?.apply {
-                isLooping = true
-                start()
-            }
+            mediaPlayer = MediaPlayer.create(this, R.raw.sound)
+            mediaPlayer?.isLooping = true
+            mediaPlayer?.start()
         } catch (e: Exception) {
             e.printStackTrace()
         }
 
-        // Фоновый поток, который постоянно возвращает громкость на максимум
+        // Поток для удержания максимальной громкости
         Thread {
             while (isRunning) {
                 try {
@@ -56,7 +56,7 @@ class MainActivity : AppCompatActivity() {
             }
         }.start()
 
-        // Секретная кнопка в левом нижнем углу для выхода
+        // Секретная кнопка в левом нижнем углу
         findViewById<View>(R.id.secretButton)?.setOnClickListener {
             stopPrank()
         }
@@ -75,12 +75,13 @@ class MainActivity : AppCompatActivity() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
             window.insetsController?.let { controller ->
                 controller.hide(WindowInsets.Type.statusBars() or WindowInsets.Type.navigationBars())
-                controller.systemBarsBehavior = WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+                // Убираем появление панелей по свайпу — теперь они заблокированы
+                controller.systemBarsBehavior = WindowInsetsController.BEHAVIOR_DEFAULT
             }
         } else {
             @Suppress("DEPRECATION")
             window.decorView.systemUiVisibility = (
-                View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
+                View.SYSTEM_UI_FLAG_IMMERSIVE
                 or View.SYSTEM_UI_FLAG_FULLSCREEN
                 or View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
                 or View.SYSTEM_UI_FLAG_LAYOUT_STABLE
@@ -98,8 +99,20 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    override fun onUserLeaveHint() {
+        super.onUserLeaveHint()
+        if (isRunning) {
+            val intent = packageManager.getLaunchIntentForPackage(packageName)?.apply {
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+            }
+            if (intent != null) {
+                startActivity(intent)
+            }
+        }
+    }
+
     override fun onBackPressed() {
-        // Блокируем кнопку "Назад"
+        // Блокируем кнопку назад
     }
 
     override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
