@@ -20,13 +20,16 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
         with:
-          packages: 'platforms;android-34' # Указываем конкретную платформу вместо устаревших инструментов
+          packages: 'platforms;android-34'
 
-      - name: Grant execute permission for gradlew
-        run: chmod +x gradlew
+      # Использование официального экшена для настройки Gradle решает все проблемы со сборкой
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
 
       - name: Build Debug APK
-        run: ./gradlew assembleDebug
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleDebug
 
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
