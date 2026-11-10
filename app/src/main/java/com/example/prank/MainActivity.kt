@@ -3,9 +3,12 @@ package com.example.prank
 import android.content.Context
 import android.media.AudioManager
 import android.media.MediaPlayer
+import android.os.Build
 import android.os.Bundle
 import android.view.KeyEvent
 import android.view.View
+import android.view.WindowInsets
+import android.view.WindowInsetsController
 import android.view.WindowManager
 import androidx.appcompat.app.AppCompatActivity
 
@@ -17,13 +20,10 @@ class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // Разворачиваем поверх блокировки экрана и не даем ему погаснуть
-        window.setFlags(
-            WindowManager.LayoutParams.FLAG_FULLSCREEN or
+        // Хардкор: вылезаем поверх блокировки экрана и не даем ему погаснуть
+        window.addFlags(
             WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED or
-            WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON,
-            WindowManager.LayoutParams.FLAG_FULLSCREEN or
-            WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED or
+            WindowManager.LayoutParams.FLAG_DISMISS_KEYGUARD or
             WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON
         )
 
@@ -34,13 +34,17 @@ class MainActivity : AppCompatActivity() {
         audioManager = getSystemService(Context.AUDIO_SERVICE) as AudioManager
         setMaxVolume()
 
-        // Запуск твоего звука (res/raw/sound.mp3) в цикле
-        mediaPlayer = MediaPlayer.create(this, R.raw.sound).apply {
-            isLooping = true
-            start()
+        // Запуск звука в цикле
+        try {
+            mediaPlayer = MediaPlayer.create(this, R.raw.sound)?.apply {
+                isLooping = true
+                start()
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
         }
 
-        // Фоновый поток, который каждые 150мс проверяет и возвращает громкость на максимум, если её пытаются сбросить
+        // Фоновый поток, который постоянно возвращает громкость на максимум
         Thread {
             while (isRunning) {
                 try {
@@ -52,41 +56,52 @@ class MainActivity : AppCompatActivity() {
             }
         }.start()
 
-        // Обработка нажатия на секретную невидимую кнопку в левом нижнем углу
-        findViewById<View>(R.id.secretButton).setOnClickListener {
+        // Секретная кнопка в левом нижнем углу для выхода
+        findViewById<View>(R.id.secretButton)?.setOnClickListener {
             stopPrank()
         }
     }
 
     private fun setMaxVolume() {
-        val maxVol = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
-        audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, maxVol, 0)
+        try {
+            val maxVol = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
+            audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, maxVol, 0)
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
     }
 
     private fun hideSystemUI() {
-        window.decorView.systemUiVisibility = (
-            View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
-            or View.SYSTEM_UI_FLAG_FULLSCREEN
-            or View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
-            or View.SYSTEM_UI_FLAG_LAYOUT_STABLE
-            or View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
-            or View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
-        )
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            window.insetsController?.let { controller ->
+                controller.hide(WindowInsets.Type.statusBars() or WindowInsets.Type.navigationBars())
+                controller.systemBarsBehavior = WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+            }
+        } else {
+            @Suppress("DEPRECATION")
+            window.decorView.systemUiVisibility = (
+                View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
+                or View.SYSTEM_UI_FLAG_FULLSCREEN
+                or View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
+                or View.SYSTEM_UI_FLAG_LAYOUT_STABLE
+                or View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
+                or View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
+            )
+        }
     }
 
     override fun onWindowFocusChanged(hasFocus: Boolean) {
         super.onWindowFocusChanged(hasFocus)
         if (hasFocus) {
             hideSystemUI()
+            setMaxVolume()
         }
     }
 
-    // Блокируем системную кнопку "Назад"
     override fun onBackPressed() {
-        // Ничего не делаем
+        // Блокируем кнопку "Назад"
     }
 
-    // Перехватываем физические кнопки громкости, чтобы они не работали
     override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
         if (keyCode == KeyEvent.KEYCODE_VOLUME_DOWN || keyCode == KeyEvent.KEYCODE_VOLUME_UP) {
             setMaxVolume()
@@ -95,12 +110,16 @@ class MainActivity : AppCompatActivity() {
         return super.onKeyDown(keyCode, event)
     }
 
-    // Остановка пранка и выход из приложения при нажатии на секретную кнопку
     private fun stopPrank() {
         isRunning = false
-        mediaPlayer?.stop()
-        mediaPlayer?.release()
-        mediaPlayer = null
-        finish()
+        try {
+            mediaPlayer?.stop()
+            mediaPlayer?.release()
+        } catch (e: Exception) {
+            e.printStackTrace()
+        } finally {
+            mediaPlayer = null
+            finish()
+        }
     }
 }
