@@ -4,7 +4,7 @@
     android:layout_height="match_parent"
     android:background="@android:color/black">
 
-    <!-- Картинка на весь экран -->
+    <!-- Твоя картинка на весь экран -->
     <ImageView
         android:id="@+id/prankImage"
         android:layout_width="match_parent"
